@@ -1,0 +1,13 @@
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.c)
+file(GLOB_RECURSE HEADER_FILES CONFIGURE_DEPENDS *.h)
+file(GLOB_RECURSE RESOURCE_FILES CONFIGURE_DEPENDS resources/*)
+
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_sources(${PROJECT_NAME} PRIVATE ${SOURCE_FILES} ${HEADER_FILES})
+
+add_custom_target(CopyResources
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/resources $<TARGET_FILE_DIR:${PROJECT_NAME}>/resources
+  DEPENDS ${RESOURCE_FILES}
+)
+
+add_dependencies(${PROJECT_NAME} CopyResources)

@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.23)
+project(consolme C)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(RAYLIB_VERSION 6.0)
+include(FetchContent)
+
+FetchContent_Declare(
+    raylib
+    DOWNLOAD_EXTRACT_TIMESTAMP OFF
+    URL https://github.com/raysan5/raylib/archive/refs/tags/${RAYLIB_VERSION}.tar.gz
+    FIND_PACKAGE_ARGS
+)
+
+FetchContent_MakeAvailable(raylib)
+
+FetchContent_Declare(
+  cmyreflection
+  GIT_REPOSITORY https://github.com/oonamo/CMyReflection.git
+  GIT_TAG main
+)
+
+FetchContent_MakeAvailable(cmyreflection)
+
+add_library(${PROJECT_NAME} STATIC)
+add_subdirectory(src)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PROJECT_NAME})
+
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib cmyreflection)
+
+target_compile_options(${PROJECT_NAME} PRIVATE
+  -Wall
+  -Wextra
+  -Wstrict-prototypes
+  -Werror
+  -Wno-unused-parameter
+  -Wno-unused-function
+)
+
+if (PROJECT_IS_TOP_LEVEL)
+  add_subdirectory(examples)
+endif()
