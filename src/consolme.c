@@ -1,3 +1,4 @@
+#include "consoleme_internal.h"
 #include "consolme/render.h"
 #include <raylib.h>
 #include <stdio.h>
@@ -26,6 +27,7 @@ static void __Console_UpdateAutocomplete(ConsoleCtx *ctx)
     ac->match_count = 0;
     ac->selected_match = 0;
 
+    // TODO: show all available commands
     if (box->buffer_len == 0)
     {
         ac->is_active = 0;
@@ -77,9 +79,47 @@ static void __Console_UpdateAutocomplete(ConsoleCtx *ctx)
 
             for (size_t i = 0; i < active_cmd->arg_count; i++)
             {
-                if (strncmp(arg_typed, active_cmd->args[i], arg_len) == 0)
+                const char *cand = active_cmd->args[i];
+                if (strncmp(arg_typed, cand, arg_len) == 0)
                 {
-                    ac->match_strings[ac->match_count++] = active_cmd->args[i];
+                    const char *dot_ptr = strchr(cand + arg_len, '.');
+
+                    if (dot_ptr != NULL)
+                    {
+                        size_t display_len = (dot_ptr - cand) + 1;
+
+                        bool is_dup = false;
+                        for (size_t m = 0; m < ac->match_count; m++)
+                        {
+                            if (strncmp(ac->match_strings[m], cand,
+                                        display_len) == 0 &&
+                                ac->match_strings[m][display_len] == '\0')
+                            {
+                                is_dup = true;
+                                break;
+                            }
+                        }
+
+                        if (!is_dup)
+                        {
+                            strncpy(ac->dynamic_matches[ac->match_count], cand,
+                                    display_len);
+                            ac->dynamic_matches[ac->match_count][display_len] =
+                                '\0';
+
+                            ac->match_strings[ac->match_count] =
+                                ac->dynamic_matches[ac->match_count];
+
+                            ac->match_count++;
+                        }
+                    }
+                    else
+                    {
+                        ac->match_strings[ac->match_count] =
+                            active_cmd->args[i];
+
+                        ac->match_count++;
+                    }
                     if (ac->match_count >= 10) break;
                 }
             }
@@ -147,8 +187,9 @@ void Console_Update(ConsoleCtx *ctx)
 
             if (ac->is_arg_completion)
             {
-                snprintf(box->buffer, MAX_INPUT_CHARS, "%s%s", ac->base_cmd_buf,
-                         match);
+                bool is_node = match[strlen(match) - 1] == '.';
+                snprintf(box->buffer, MAX_INPUT_CHARS, "%s%s%s",
+                         ac->base_cmd_buf, match, is_node ? "" : " ");
             }
             else { snprintf(box->buffer, MAX_INPUT_CHARS, "%s ", match); }
 
@@ -171,19 +212,20 @@ void Console_Update(ConsoleCtx *ctx)
 
     if (IsKeyPressed(KEY_ENTER))
     {
-        char error_msg[MAX_INPUT_CHARS] = {0};
+        char response_msg[MAX_INPUT_CHARS] = {0};
         bool success = true;
 
         if (ctx->on_command != NULL)
         {
-            success = ctx->on_command(box->buffer, ctx->user_data, error_msg);
+            success =
+                ctx->on_command(box->buffer, ctx->user_data, response_msg);
         }
 
         __Console_PushHistory(ctx, box->buffer, success ? RAYWHITE : RED);
 
-        if (!success && error_msg[0] != '\0')
+        if (response_msg[0] != '\0')
         {
-            __Console_PushHistory(ctx, error_msg, RED);
+            __Console_PushHistory(ctx, response_msg, success ? LIGHTGRAY : RED);
         }
 
         memset(box->buffer, 0, MAX_INPUT_CHARS);
@@ -193,15 +235,6 @@ void Console_Update(ConsoleCtx *ctx)
     }
 
     if (buffer_changed) __Console_UpdateAutocomplete(ctx);
-}
-
-static char *Console_StrDup(const char *src)
-{
-    if (!src) return NULL;
-    size_t len = strlen(src) + 1;
-    char *dst = (char *)malloc(len);
-    if (dst) memcpy(dst, src, len);
-    return dst;
 }
 
 static ConsoleCommandDef *Console_EnsureCapacity(ConsoleAutocomplete *ac)

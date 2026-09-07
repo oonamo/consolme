@@ -5,8 +5,16 @@
 /// @reflect
 typedef struct
 {
+    float pos;
+    int dir;
+} Player;
+
+/// @reflect
+typedef struct
+{
     int level;
     Color background_color;
+    Player player;
 } Game;
 
 #endif // _TYPES_H

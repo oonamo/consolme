@@ -41,7 +41,7 @@ typedef struct
 } ConsoleConfig;
 
 typedef bool (*ConsoleCommandCallback)(const char *command, void *user_data,
-                                       char *out_err_msg);
+                                       char *response_msg);
 
 typedef struct
 {
@@ -63,6 +63,7 @@ typedef struct
     size_t command_count;
     size_t command_capacity;
 
+    char dynamic_matches[10][MAX_INPUT_CHARS];
     const char *match_strings[10];
     size_t match_count;
     size_t selected_match;
