@@ -38,6 +38,7 @@ typedef struct
     Color border;
 
     ConsoleInputBoxCfg input_cfg;
+    KeyboardKey open_key;
 } ConsoleConfig;
 
 typedef bool (*ConsoleCommandCallback)(const char *command, void *user_data,

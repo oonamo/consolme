@@ -3,182 +3,96 @@
 #include "refl.generated.h"
 // clang-format on
 
-#include <consolme/extensions/cmyreflection.h>
-#include <consolme/render.h>
+#define CONSOLME_IMPLEMENTATION
+#define CONSOLME_EXTENSION_CMYREFLECTION
+#include <consolme.h>
+
 #include <math.h>
 #include <raylib.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-static Game g = {0};
+static const int width = 1600;
+static const int height = 800;
 
-bool PrintCommand(const char *command, void *user_data, char *response_msg)
+Game g = {.ball = {.pos = {width / 2.0f, height / 2.0f},
+                   .speed = {200.0f, 150.0f},
+                   .radius = 40.0f},
+          .theme = {
+              30,
+              .ball_color = GRAY,
+          }};
+
+DEFINE_COLOR_SETTER(Set_Color);
+DEFINE_FLOAT2_SETTER(Set_Vector2, Vector2, x, y);
+DEFINE_FLOAT4_SETTER(Set_Rectangle, Rectangle, x, y, width, height);
+
+bool GameTypeHandler(void *target_struct, const FieldInfo *leaf,
+                     void *field_ptr, int argc, char **argv, char *response_msg)
 {
+
+    switch (leaf->type)
+    {
+    case TYPE_CONSTSTR:
+        break;
+    case TYPE_FLOAT:
+        break;
+    case TYPE_GAMESTATE:
+        break;
+    case TYPE_INT:
+        break;
+    case TYPE_STR:
+        break;
+    case TYPE_STRUCT_BALL:
+        break;
+    case TYPE_STRUCT_COLOR:
+        return Set_Color(field_ptr, argc, argv, response_msg);
+    case TYPE_STRUCT_GAME:
+        break;
+    case TYPE_STRUCT_THEME:
+        break;
+    case TYPE_STRUCT_VECTOR2:
+        return Set_Vector2(field_ptr, argc, argv, response_msg);
+    case TYPE_UNKNOWN:
+        break;
+    case TYPE_UNSIGNEDCHAR:
+        break;
+    }
+    snprintf(response_msg, MAX_INPUT_CHARS, "Type was not implmeneted!");
+    return false;
+}
+
+bool GameConsole(const char *command, void *user_data, char *response_msg)
+{
+    Game *active_game = (Game *)user_data;
     char cmd_copy[MAX_INPUT_CHARS];
     strncpy(cmd_copy, command, MAX_INPUT_CHARS);
     cmd_copy[MAX_INPUT_CHARS - 1] = '\0';
 
     char *argv[10];
     int argc = Console_Tokenize(cmd_copy, argv, 10);
-
     if (argc == 0) return true;
 
-    if (strcmp(argv[0], "color") == 0)
-    {
-        if (argc < 2)
-        {
-            snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: 'color' requires an argument");
-            return false;
-        }
-
-        if (strcmp(argv[1], "red") == 0) { g.background_color = RED; }
-        else if (strcmp(argv[1], "blue") == 0) { g.background_color = BLUE; }
-        else if (strcmp(argv[1], "raywhite") == 0)
-        {
-            g.background_color = RAYWHITE;
-        }
-        else
-        {
-            snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: color '%s' was not found", argv[1]);
-            return false;
-        }
-    }
-    else if (strcmp(argv[0], "set") == 0)
+    if (strcmp(argv[0], "set") == 0)
     {
         if (argc < 3)
         {
             snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: set requires a path and a value");
+                     "Usage: set <path> <value>");
             return false;
         }
 
-        const char *path = argv[1];
-        const char *value = argv[2];
-
-        bool had_success = false;
-
-        const FieldInfo *leaf_field = NULL;
-
-        void *target_ptr = resolve_field_path(
-            &g, Game_Metadata, Game_FieldCount, path, &leaf_field);
-
-        if (!target_ptr || !leaf_field)
-        {
-            snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: Could not resolve path `%s`", path);
-            return false;
-        }
-
-        switch (leaf_field->type)
-        {
-        case TYPE_COLOR:
-            break;
-        case TYPE_FLOAT:
-            *(float *)target_ptr = atof(value);
-            had_success = true;
-        case TYPE_INT:
-            *(int *)target_ptr = atoi(value);
-            had_success = true;
-            break;
-        case TYPE_STR:
-            target_ptr = (char *)value;
-            had_success = true;
-            break;
-        case TYPE_STRUCT_GAME:
-            break;
-        case TYPE_STRUCT_PLAYER:
-            break;
-        case TYPE_UNKNOWN:
-            break;
-        }
-
-        if (!had_success)
-        {
-            snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: Could not set path `%s` to '%s'", path, value);
-        }
-
-        return had_success;
+        return Console_ReflectionSet(active_game, Game_Metadata,
+                                     Game_FieldCount, argv[1], argc - 2,
+                                     argv + 2, GameTypeHandler, response_msg);
     }
-    else if (strcmp("get", argv[0]) == 0)
-    {
-        if (argc != 2)
-        {
-            snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: get requires just a path");
-            return false;
-        }
-
-        const char *path = argv[1];
-
-        bool had_success = false;
-
-        const FieldInfo *leaf_field = NULL;
-
-        void *target_ptr = resolve_field_path(
-            &g, Game_Metadata, Game_FieldCount, path, &leaf_field);
-
-        if (!target_ptr || !leaf_field)
-        {
-            snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: Could not resolve path `%s`", path);
-            return false;
-        }
-
-        switch (leaf_field->type)
-        {
-        case TYPE_COLOR:
-            break;
-        case TYPE_FLOAT:
-            snprintf(response_msg, MAX_INPUT_CHARS, "%s = %f", path,
-                     *(float *)target_ptr);
-            had_success = true;
-        case TYPE_INT:
-            had_success = true;
-            snprintf(response_msg, MAX_INPUT_CHARS, "%s = %d", path,
-                     *(int *)target_ptr);
-            break;
-        case TYPE_STR:
-            snprintf(response_msg, MAX_INPUT_CHARS, "%s = \"%s\"", path,
-                     (char *)target_ptr);
-            had_success = true;
-            break;
-        case TYPE_STRUCT_GAME:
-            break;
-        case TYPE_STRUCT_PLAYER:
-            break;
-        case TYPE_UNKNOWN:
-            break;
-        }
-
-        if (!had_success)
-        {
-            snprintf(response_msg, MAX_INPUT_CHARS,
-                     "Error: Could not get path `%s`", path);
-        }
-    }
-    else
-    {
-        snprintf(response_msg, MAX_INPUT_CHARS, "Error: Invalid command '%s'",
-                 argv[0]);
-        return false;
-    }
+    else if (strcmp(argv[0], "get") == 0) {}
 
     return true;
 }
 
-static const char *core_args[] = {"restart", "exit"};
-static const char *color_args[] = {"red", "blue", "raywhite"};
-
 int main(void)
 {
-    static const int width = 1600;
-    static const int height = 800;
-
-    g.level = 1;
-    g.background_color = RAYWHITE;
 
     Rectangle console_rec = {5, 5, width - 10, (int)(height / 4.0f)};
     Rectangle input_box = {
@@ -186,6 +100,8 @@ int main(void)
         console_rec.width, console_rec.height - console_rec.height * 0.75f};
 
     InitWindow(1600, 800, "consolme");
+    SetTargetFPS(60);
+
     ConsoleInputBoxCfg input_cfg = {
         .blink_interval = 500,
         .text_color = GRAY,
@@ -199,36 +115,64 @@ int main(void)
         .border = ORANGE,
         .border_width = 2.0f,
         .input_cfg = input_cfg,
+        .open_key = KEY_GRAVE,
     };
 
-    ConsoleCtx ctx = {0};
-    ctx.cfg = cfg;
-    ctx.is_open = true;
-    ctx.on_command = PrintCommand;
+    ConsoleCtx console = {0};
+    console.cfg = cfg;
+    console.is_open = true;
+    console.on_command = GameConsole;
+    console.user_data = &g;
 
-    Console_RegisterStaticCommand(&ctx, "sys", core_args, 2);
-    Console_RegisterStaticCommand(&ctx, "color", color_args, 3);
+    const char *stop_args[] = {NULL};
+    Console_RegisterStaticCommand(&console, "stop", stop_args, 0);
 
     ConsoleReflectionCfg ref_cfg = {.enable_setter = true,
                                     .setter_cmd = "set",
                                     .enable_getter = true,
                                     .getter_cmd = "get"};
 
-    Console_GenerateReflectionCompletion(&ctx, NULL, Game_Metadata,
+    Console_GenerateReflectionCompletion(&console, NULL, Game_Metadata,
                                          Game_FieldCount, ref_cfg);
 
     while (!WindowShouldClose())
     {
-        Console_Update(&ctx);
-        BeginDrawing();
-        ClearBackground(g.background_color);
-        Console_DrawUI(&ctx);
+        Console_Update(&console);
 
-        DrawText(TextFormat("Level: %d", g.level), 0, height * 0.8, 20, BLACK);
+        if (!console.is_open)
+        {
+            float dt = GetFrameTime();
+
+            g.ball.pos.x += g.ball.speed.x * dt;
+            g.ball.pos.y += g.ball.speed.y * dt;
+
+            if (g.ball.pos.x - g.ball.radius <= 0 ||
+                g.ball.pos.x + g.ball.radius >= width)
+            {
+                g.ball.speed.x = -g.ball.speed.x;
+            }
+            if (g.ball.pos.y - g.ball.radius <= 0 ||
+                g.ball.pos.y + g.ball.radius >= height)
+            {
+                g.ball.speed.y = -g.ball.speed.y;
+            }
+        }
+
+        BeginDrawing();
+        ClearBackground(
+            (Color){g.theme.bg_shade, g.theme.bg_shade, g.theme.bg_shade, 255});
+
+        DrawText(TextFormat("Score: %d", g.score), 0, height * 0.8, 20, GRAY);
+
+        DrawCircleV(g.ball.pos, g.ball.radius, g.theme.ball_color);
+
+        DrawText("Press ` to toggle console", 10, 570, 20, GRAY);
+
+        Console_DrawUI(&console);
         EndDrawing();
     }
 
-    Console_Free(&ctx);
+    Console_Free(&console);
 
     CloseWindow();
 };

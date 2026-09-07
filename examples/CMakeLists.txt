@@ -12,4 +12,4 @@ add_custom_command(
 add_executable(example ${REFLECTION_SOURCE_FILES} ${CMAKE_CURRENT_BINARY_DIR}/refl.generated.h)
 target_link_libraries(example PUBLIC ${PROJECT_NAME} raylib cmyreflection)
 
-target_include_directories(example PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(example PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${PROJECT_SOURCE_DIR})

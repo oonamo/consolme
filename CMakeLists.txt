@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.23)
 project(consolme C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -23,22 +22,7 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(cmyreflection)
 
-add_library(${PROJECT_NAME} STATIC)
-add_subdirectory(src)
-
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PROJECT_NAME})
-
-target_link_libraries(${PROJECT_NAME} PRIVATE raylib cmyreflection)
-
-target_compile_options(${PROJECT_NAME} PRIVATE
-  -Wall
-  -Wextra
-  -Wstrict-prototypes
-  -Werror
-  -Wno-unused-parameter
-  -Wno-unused-function
-)
+add_library(${PROJECT_NAME} INTERFACE)
 
 if (PROJECT_IS_TOP_LEVEL)
   add_subdirectory(examples)
