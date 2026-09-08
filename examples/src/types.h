@@ -45,17 +45,16 @@ typedef enum
     GAME_PAUSED,
 } GameState;
 
-#define MAX_OTHER_BALLS 9
+#define MAX_BALLS 9
 
 /// @reflect
 typedef struct
 {
-    Ball main_ball;
     Theme theme;
     GameState state;
     int score;
 
-    Ball other_balls[MAX_OTHER_BALLS];
+    Ball balls[MAX_BALLS];
 } Game;
 
 #endif // _TYPES_H

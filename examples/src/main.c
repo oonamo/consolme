@@ -27,16 +27,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static const int width = 1600;
-static const int height = 800;
+static int width = 1600;
+static int height = 800;
 
 //----------------------------------------
 // Global Game State
 //----------------------------------------
 Game g = {.state = GAME_PLAYING,
-          .main_ball = {.pos = {width / 2.0f, height / 2.0f},
-                        .speed = {200.0f, 150.0f},
-                        .radius = 40.0f},
           .theme = {
               30,
               .ball_color = GRAY,
@@ -169,6 +166,11 @@ int main(void)
     //----------------------------------------
     // Initialization
     //----------------------------------------
+    width = 1600;
+    height = 800;
+    InitWindow(width, height, "consolme - cmyreflection + raylib");
+    SetTargetFPS(60);
+
     Rectangle console_rec = {5, 5, width - 10, (int)(height / 4.0f)};
     Rectangle input_box = {
         console_rec.x, console_rec.y + console_rec.height * 0.75f,
@@ -179,9 +181,9 @@ int main(void)
     };
 
     // Populate random bouncing balls
-    for (int i = 0; i < MAX_OTHER_BALLS; i++)
+    for (int i = 0; i < MAX_BALLS; i++)
     {
-        Ball *b = &g.other_balls[i];
+        Ball *b = &g.balls[i];
         b->radius = GetRandomValue(12, 120);
 
         b->pos.x = GetRandomValue(b->radius, width - b->radius);
@@ -191,9 +193,6 @@ int main(void)
         b->speed.y = GetRandomValue(12, 100);
         b->color = color_choices[GetRandomValue(0, 8)];
     }
-
-    InitWindow(1600, 800, "consolme - cmyreflection + raylib");
-    SetTargetFPS(60);
 
     // Configure visual layout and theme
     ConsoleInputBoxCfg input_cfg = {
@@ -210,12 +209,16 @@ int main(void)
         .border = ORANGE,
         .border_width = 2.0f,
         .input_cfg = input_cfg,
+        .font_size = 20,
         .open_key = KEY_GRAVE,
     };
 
     // Initialize context
     ConsoleCtx console = {0};
     console.cfg = cfg;
+
+    Console_Setup(&console);
+
     console.is_open = true;
     console.on_command = GameConsole;
     console.user_data = &g;
@@ -250,23 +253,9 @@ int main(void)
         {
             float dt = GetFrameTime();
 
-            g.main_ball.pos.x += g.main_ball.speed.x * dt;
-            g.main_ball.pos.y += g.main_ball.speed.y * dt;
-
-            if (g.main_ball.pos.x - g.main_ball.radius <= 0 ||
-                g.main_ball.pos.x + g.main_ball.radius >= width)
+            for (int i = 0; i < MAX_BALLS; i++)
             {
-                g.main_ball.speed.x = -g.main_ball.speed.x;
-            }
-            if (g.main_ball.pos.y - g.main_ball.radius <= 0 ||
-                g.main_ball.pos.y + g.main_ball.radius >= height)
-            {
-                g.main_ball.speed.y = -g.main_ball.speed.y;
-            }
-
-            for (int i = 0; i < MAX_OTHER_BALLS; i++)
-            {
-                Ball *b = &g.other_balls[i];
+                Ball *b = &g.balls[i];
                 b->pos.x += b->speed.x * dt;
                 b->pos.y += b->speed.y * dt;
 
@@ -287,12 +276,19 @@ int main(void)
 
         DrawText(TextFormat("Score: %d", g.score), 0, height * 0.8, 20, GRAY);
 
-        DrawCircleV(g.main_ball.pos, g.main_ball.radius, g.theme.ball_color);
-
-        for (int i = 0; i < MAX_OTHER_BALLS; i++)
+        for (int i = 0; i < MAX_BALLS; i++)
         {
-            Ball *b = &g.other_balls[i];
+            Ball *b = &g.balls[i];
             DrawCircleV(b->pos, b->radius, b->color);
+
+            const char *idx_text = TextFormat("%d", i);
+            int font_size = 20;
+
+            int text_width = MeasureText(idx_text, font_size);
+            int text_x = (int)(b->pos.x - (text_width / 2.0f));
+            int text_y = (int)(b->pos.y - (text_width / 2.0f));
+
+            DrawText(idx_text, text_x, text_y, font_size, BLACK);
         }
 
         DrawText("Press ` to toggle console", 10, 570, 20, GRAY);

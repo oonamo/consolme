@@ -49,6 +49,10 @@ typedef struct
     Color background;
     Color border;
 
+    Font font;
+    int font_size;
+    int font_spacing;
+
     ConsoleInputBoxCfg input_cfg;
     KeyboardKey open_key;
 } ConsoleConfig;
@@ -123,6 +127,7 @@ typedef struct
     float bksp_timer;
 } ConsoleCtx;
 
+void Console_Setup(ConsoleCtx *ctx);
 void Console_Update(ConsoleCtx *ctx);
 void Console_Free(ConsoleCtx *ctx);
 
@@ -287,6 +292,26 @@ void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
 #include <raylib.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#define GET_FONT_CONFG(cfg)                                                    \
+    Font font = cfg->font.texture.id != 0 ? cfg->font : GetFontDefault();      \
+    int f_size = cfg->font_size > 0 ? cfg->font_size : 20;                     \
+    int f_spacing = cfg->font_spacing > 0 ? cfg->font_spacing : 1;
+
+void Console_Setup(ConsoleCtx *ctx)
+{
+    float padding = 10.0f;
+    ConsoleConfig *cfg = &ctx->cfg;
+
+    GET_FONT_CONFG(cfg)
+
+    if (cfg->input_cfg.box.height <= 0.1f)
+    {
+        cfg->input_cfg.box.height = f_size + padding;
+        cfg->input_cfg.box.y =
+            cfg->bounds.y + cfg->bounds.height - cfg->input_cfg.box.height;
+    }
+}
 
 char *Console_StrDup(const char *src);
 
@@ -856,21 +881,25 @@ int Console_Tokenize(char *buffer, char *args[], int max_args)
 static void __Console_Draw_History(ConsoleCtx *ctx)
 {
     ConsoleConfig *cfg = &ctx->cfg;
-    int font_size = 20;
+
+    GET_FONT_CONFG(cfg);
+
     int spacing = 2;
     int start_y = cfg->bounds.y + cfg->bounds.height -
-                  cfg->input_cfg.box.height - font_size - 10;
+                  cfg->input_cfg.box.height - f_size - 10;
 
     for (int i = ctx->history_count - 1; i >= 0; i--)
     {
         ConsoleLine *line = &ctx->history[i];
-        DrawText(line->text, cfg->bounds.x + 10, start_y, font_size,
-                 line->text_color);
+
+        DrawTextEx(font, line->text, (Vector2){cfg->bounds.x + 10, start_y},
+                   f_size, f_spacing, line->text_color);
         if (line->has_swatch)
         {
-            int text_width = MeasureText(line->text, font_size);
+            int text_width =
+                MeasureTextEx(font, line->text, f_size, f_spacing).x;
             int padding = 10;
-            int swatch_size = font_size - 4;
+            int swatch_size = f_size - 4;
 
             int swatch_x = cfg->bounds.x + 10 + text_width + padding;
             int swatch_y = start_y + 2;
@@ -880,34 +909,38 @@ static void __Console_Draw_History(ConsoleCtx *ctx)
             DrawRectangleLines(swatch_x, swatch_y, swatch_size, swatch_size,
                                RAYWHITE);
         }
-        start_y -= (font_size + spacing);
+        start_y -= (f_size + spacing);
         if (start_y < cfg->bounds.y) break; // Don't draw outside bounds
     }
 }
 
 static void __Console_Draw_TextBox(ConsoleCtx *ctx)
 {
-    ConsoleInputBoxCfg *cfg = &ctx->cfg.input_cfg;
+    ConsoleConfig *cfg = &ctx->cfg;
+    ConsoleInputBoxCfg *input_cfg = &cfg->input_cfg;
     ConsoleInputBox *box = &ctx->box;
+    GET_FONT_CONFG(cfg);
 
-    DrawRectangleRec(cfg->box, cfg->text_box_color);
+    DrawRectangleRec(input_cfg->box, input_cfg->text_box_color);
 
-    int font_size = 20;
-    DrawText(box->buffer, cfg->box.x + 5,
-             cfg->box.y + (cfg->box.height - font_size) / 2, font_size,
-             cfg->text_color);
+    Vector2 text_pos = {input_cfg->box.x + 5,
+                        input_cfg->box.y +
+                            (input_cfg->box.height - f_size) / 2.0f};
+
+    DrawTextEx(font, box->buffer, text_pos, f_size, f_spacing,
+               input_cfg->text_color);
 
     if (box->cursor_visible)
     {
-        // Calculate width of string up to cursor to place the cursor correctly
         char temp[MAX_INPUT_CHARS];
         strncpy(temp, box->buffer, box->cursor_pos);
         temp[box->cursor_pos] = '\0';
 
-        int text_width = MeasureText(temp, font_size);
-        DrawRectangle(cfg->box.x + 5 + text_width,
-                      cfg->box.y + (cfg->box.height - font_size) / 2, 10,
-                      font_size, cfg->cursor_color);
+        // int text_width = MeasureTextEx(temp, font_size);
+        int text_width = MeasureTextEx(font, temp, f_size, f_spacing).x;
+        DrawRectangle(input_cfg->box.x + 5 + text_width,
+                      input_cfg->box.y + (input_cfg->box.height - f_size) / 2,
+                      10, f_size, input_cfg->cursor_color);
     }
 }
 
@@ -917,8 +950,8 @@ static void __Console_Draw_Autocomplete(ConsoleCtx *ctx)
     if (!ac->is_active) return;
 
     ConsoleConfig *cfg = &ctx->cfg;
-    int font_size = 20;
-    int row_height = font_size + 4;
+    GET_FONT_CONFG(cfg);
+    int row_height = f_size + 4;
 
     Rectangle popup = {cfg->input_cfg.box.x,
                        cfg->input_cfg.box.y - (ac->match_count * row_height) -
@@ -939,7 +972,7 @@ static void __Console_Draw_Autocomplete(ConsoleCtx *ctx)
         }
 
         const char *text = ac->match_strings[i];
-        DrawText(text, popup.x + 5, y_pos + 2, font_size, RAYWHITE);
+        DrawText(text, popup.x + 5, y_pos + 2, f_size, RAYWHITE);
     }
 }
 
