@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.23)
 project(consolme C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
