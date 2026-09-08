@@ -1068,6 +1068,21 @@ void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
     free(results.items);
 }
 
+static void *__Console_GetTargetStruct(void *base_instance,
+                                       const FieldInfo *base_meta,
+                                       size_t base_count, const char *path,
+                                       const FieldInfo **leaf)
+{
+    char clean_path[MAX_INPUT_CHARS];
+    snprintf(clean_path, sizeof(clean_path), "%s", path);
+
+    size_t len = strlen(clean_path);
+    if (len > 0 && clean_path[len - 1] == '.') { clean_path[len - 1] = '\0'; }
+
+    return resolve_field_path(base_instance, base_meta, base_count, clean_path,
+                              leaf);
+}
+
 ConsoleResponse Console_ReflectionSet(void *base_instance,
                                       const FieldInfo *base_meta,
                                       size_t base_count, const char *path,
@@ -1076,8 +1091,8 @@ ConsoleResponse Console_ReflectionSet(void *base_instance,
                                       char *response_msg)
 {
     const FieldInfo *leaf = NULL;
-    void *target_struct =
-        resolve_field_path(base_instance, base_meta, base_count, path, &leaf);
+    void *target_struct = __Console_GetTargetStruct(base_instance, base_meta,
+                                                    base_count, path, &leaf);
 
     if (!target_struct || !leaf)
     {
@@ -1140,9 +1155,10 @@ ConsoleResponse Console_ReflectionGet(void *base_instance,
                                       ReflectionTypeHandler custom_handler,
                                       char *response_msg)
 {
+
     const FieldInfo *leaf = NULL;
-    void *target_struct =
-        resolve_field_path(base_instance, base_meta, base_count, path, &leaf);
+    void *target_struct = __Console_GetTargetStruct(base_instance, base_meta,
+                                                    base_count, path, &leaf);
 
     if (!leaf || !target_struct)
     {
