@@ -28,6 +28,7 @@ typedef struct
     Vector2 pos;
     Vector2 speed;
     float radius;
+    Color color;
 } Ball;
 
 /// @reflect
@@ -44,7 +45,7 @@ typedef enum
     GAME_PAUSED,
 } GameState;
 
-#define OTHER_BALL_SIZE 9
+#define MAX_OTHER_BALLS 9
 
 /// @reflect
 typedef struct
@@ -54,7 +55,7 @@ typedef struct
     GameState state;
     int score;
 
-    Ball other_balls[OTHER_BALL_SIZE];
+    Ball other_balls[MAX_OTHER_BALLS];
 } Game;
 
 #endif // _TYPES_H
