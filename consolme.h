@@ -112,6 +112,7 @@ typedef struct
 
     ConsoleLine history[MAX_LINES];
     size_t history_count;
+    int history_step;
     bool is_open;
 
     ConsoleCommandCallback on_command;
@@ -325,11 +326,7 @@ static void __Console_UpdateAutocomplete(ConsoleCtx *ctx)
     ac->selected_match = 0;
 
     // TODO: show all available commands
-    // if (box->buffer_len == 0)
-    // {
-    //     ac->is_active = 0;
-    //     return;
-    // }
+    if (box->buffer_len == 0) { ac->is_active = 0; }
 
     char *space_ptr = strchr(box->buffer, ' ');
 
@@ -432,6 +429,31 @@ static void __Console_ShowBlinker(ConsoleInputBox *box)
     box->cursor_visible = true;
 }
 
+static bool __Console_SetHistoryStep(ConsoleCtx *ctx, int target_step)
+{
+    ConsoleInputBox *box = &ctx->box;
+    int found_count = 0;
+
+    for (int i = (int)ctx->history_count - 1; i >= 0; i--)
+    {
+        if (ctx->history[i].text[0] == '>')
+        {
+            found_count++;
+            if (found_count == target_step)
+            {
+                ctx->history_step = target_step;
+                strncpy(box->buffer, ctx->history[i].text + 2, MAX_INPUT_CHARS);
+                box->buffer_len = strlen(box->buffer);
+                box->cursor_pos = box->buffer_len;
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void Console_Update(ConsoleCtx *ctx)
 {
     if (IsKeyPressed(ctx->cfg.open_key))
@@ -488,9 +510,11 @@ void Console_Update(ConsoleCtx *ctx)
 
     if (ac->is_active)
     {
-        if (IsKeyPressed(KEY_UP) && ac->selected_match > 0)
+        if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_P) &&
+            ac->selected_match > 0)
             ac->selected_match--;
-        if (IsKeyPressed(KEY_DOWN) && ac->selected_match < ac->match_count - 1)
+        if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_N) &&
+            ac->selected_match < ac->match_count - 1)
             ac->selected_match++;
         if (IsKeyPressed(KEY_TAB))
         {
@@ -513,6 +537,40 @@ void Console_Update(ConsoleCtx *ctx)
     else
     {
         // TODO: scroll stuff later
+    }
+
+    if (IsKeyPressed(KEY_UP))
+    {
+        int target_step = ctx->history_step + 1;
+
+        if (__Console_SetHistoryStep(ctx, target_step))
+        {
+            cursor_changed = true;
+            buffer_changed = true;
+        }
+    }
+
+    if (IsKeyPressed(KEY_DOWN) && ctx->history_step > 0)
+    {
+        ctx->history_step--;
+
+        if (ctx->history_step == 0)
+        {
+            memset(box->buffer, 0, MAX_INPUT_CHARS);
+            box->buffer_len = 0;
+            box->cursor_pos = 0;
+            buffer_changed = true;
+            cursor_changed = true;
+        }
+        else
+        {
+            int target_step = ctx->history_step;
+            if (__Console_SetHistoryStep(ctx, target_step))
+            {
+                cursor_changed = true;
+                buffer_changed = true;
+            }
+        }
     }
 
     if (IsKeyPressed(KEY_LEFT) && box->cursor_pos > 0)
@@ -646,6 +704,7 @@ void Console_Update(ConsoleCtx *ctx)
         box->cursor_pos = 0;
 
         ac->is_active = false;
+        ctx->history_step = 0;
         buffer_changed = false;
         cursor_changed = true;
     }
