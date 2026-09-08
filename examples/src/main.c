@@ -16,9 +16,9 @@ static const int width = 1600;
 static const int height = 800;
 
 Game g = {.state = GAME_PLAYING,
-          .ball = {.pos = {width / 2.0f, height / 2.0f},
-                   .speed = {200.0f, 150.0f},
-                   .radius = 40.0f},
+          .main_ball = {.pos = {width / 2.0f, height / 2.0f},
+                        .speed = {200.0f, 150.0f},
+                        .radius = 40.0f},
           .theme = {
               30,
               .ball_color = GRAY,
@@ -185,18 +185,18 @@ int main(void)
         {
             float dt = GetFrameTime();
 
-            g.ball.pos.x += g.ball.speed.x * dt;
-            g.ball.pos.y += g.ball.speed.y * dt;
+            g.main_ball.pos.x += g.main_ball.speed.x * dt;
+            g.main_ball.pos.y += g.main_ball.speed.y * dt;
 
-            if (g.ball.pos.x - g.ball.radius <= 0 ||
-                g.ball.pos.x + g.ball.radius >= width)
+            if (g.main_ball.pos.x - g.main_ball.radius <= 0 ||
+                g.main_ball.pos.x + g.main_ball.radius >= width)
             {
-                g.ball.speed.x = -g.ball.speed.x;
+                g.main_ball.speed.x = -g.main_ball.speed.x;
             }
-            if (g.ball.pos.y - g.ball.radius <= 0 ||
-                g.ball.pos.y + g.ball.radius >= height)
+            if (g.main_ball.pos.y - g.main_ball.radius <= 0 ||
+                g.main_ball.pos.y + g.main_ball.radius >= height)
             {
-                g.ball.speed.y = -g.ball.speed.y;
+                g.main_ball.speed.y = -g.main_ball.speed.y;
             }
         }
 
@@ -206,7 +206,7 @@ int main(void)
 
         DrawText(TextFormat("Score: %d", g.score), 0, height * 0.8, 20, GRAY);
 
-        DrawCircleV(g.ball.pos, g.ball.radius, g.theme.ball_color);
+        DrawCircleV(g.main_ball.pos, g.main_ball.radius, g.theme.ball_color);
 
         DrawText("Press ` to toggle console", 10, 570, 20, GRAY);
 

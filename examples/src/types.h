@@ -44,13 +44,17 @@ typedef enum
     GAME_PAUSED,
 } GameState;
 
+#define OTHER_BALL_SIZE 9
+
 /// @reflect
 typedef struct
 {
-    Ball ball;
+    Ball main_ball;
     Theme theme;
     GameState state;
     int score;
+
+    Ball other_balls[OTHER_BALL_SIZE];
 } Game;
 
 #endif // _TYPES_H

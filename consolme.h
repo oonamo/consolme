@@ -325,7 +325,6 @@ static void __Console_UpdateAutocomplete(ConsoleCtx *ctx)
     ac->match_count = 0;
     ac->selected_match = 0;
 
-    // TODO: show all available commands
     if (box->buffer_len == 0) { ac->is_active = 0; }
 
     char *space_ptr = strchr(box->buffer, ' ');
@@ -377,10 +376,19 @@ static void __Console_UpdateAutocomplete(ConsoleCtx *ctx)
                 if (strncmp(arg_typed, cand, arg_len) == 0)
                 {
                     const char *dot_ptr = strchr(cand + arg_len, '.');
+                    const char *bracket_ptr = strchr(cand + arg_len, '[');
 
-                    if (dot_ptr != NULL)
+                    const char *delim = NULL;
+
+                    if (dot_ptr != NULL && bracket_ptr != NULL)
                     {
-                        size_t display_len = (dot_ptr - cand) + 1;
+                        delim = dot_ptr < bracket_ptr ? dot_ptr : bracket_ptr;
+                    }
+                    else { delim = dot_ptr != NULL ? dot_ptr : bracket_ptr; }
+
+                    if (delim != NULL)
+                    {
+                        size_t display_len = (delim - cand) + 1;
 
                         bool is_dup = false;
                         for (size_t m = 0; m < ac->match_count; m++)
@@ -522,7 +530,8 @@ void Console_Update(ConsoleCtx *ctx)
 
             if (ac->is_arg_completion)
             {
-                bool is_node = match[strlen(match) - 1] == '.';
+                bool is_node = match[strlen(match) - 1] == '.' ||
+                               match[strlen(match) - 1] == '[';
                 snprintf(box->buffer, MAX_INPUT_CHARS, "%s%s%s",
                          ac->base_cmd_buf, match, is_node ? "" : " ");
             }
@@ -643,7 +652,8 @@ void Console_Update(ConsoleCtx *ctx)
         cursor_changed = true;
     }
 
-    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_W))
+    if (IsKeyDown(KEY_LEFT_CONTROL) &&
+        (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_BACKSPACE)))
     {
         size_t p = box->cursor_pos;
 
@@ -1009,37 +1019,54 @@ void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
         for (size_t i = 0; i < current.field_count; i++)
         {
             const FieldInfo *field = &current.fields[i];
-            char *path = NULL;
 
-            if (current.prefix == NULL)
-            {
-                size_t len = strlen(field->name) + 1;
-                path = malloc(len);
-                snprintf(path, len, "%s", field->name);
-            }
-            else
-            {
-                size_t len =
-                    strlen(current.prefix) + 1 + strlen(field->name) + 1;
-                path = malloc(len);
-                snprintf(path, len, "%s.%s", current.prefix, field->name);
-            }
+            size_t iter_count = (field->count > 0) ? field->count : 1;
+            bool is_array = (field->count > 1);
 
-            StructMetaData child_meta = {0};
-            if (get_struct_metadata(field->type, &child_meta))
+            for (size_t arr_idx = 0; arr_idx < iter_count; arr_idx++)
             {
-                if (q_tail >= q_capacity)
+                char node_name[256];
+                if (is_array)
                 {
-                    q_capacity *= 2;
-                    queue = realloc(queue, q_capacity * sizeof(QueueItem));
+                    snprintf(node_name, sizeof(node_name), "%s[%zu]",
+                             field->name, arr_idx);
+                }
+                else
+                {
+                    snprintf(node_name, sizeof(node_name), "%s", field->name);
                 }
 
-                queue[q_tail].prefix = path;
-                queue[q_tail].fields = child_meta.fields;
-                queue[q_tail].field_count = child_meta.count;
-                q_tail++;
+                char *path = NULL;
+                if (current.prefix == NULL)
+                {
+                    size_t len = strlen(node_name) + 1;
+                    path = malloc(len);
+                    snprintf(path, len, "%s", node_name);
+                }
+                else
+                {
+                    size_t len =
+                        strlen(current.prefix) + 1 + strlen(node_name) + 1;
+                    path = malloc(len);
+                    snprintf(path, len, "%s.%s", current.prefix, node_name);
+                }
+
+                StructMetaData child_meta = {0};
+                if (get_struct_metadata(field->type, &child_meta))
+                {
+                    if (q_tail >= q_capacity)
+                    {
+                        q_capacity *= 2;
+                        queue = realloc(queue, q_capacity * sizeof(QueueItem));
+                    }
+
+                    queue[q_tail].prefix = path;
+                    queue[q_tail].fields = child_meta.fields;
+                    queue[q_tail].field_count = child_meta.count;
+                    q_tail++;
+                }
+                else { PushStr(&results, path); }
             }
-            else { PushStr(&results, path); }
         }
 
         free(current.prefix);
