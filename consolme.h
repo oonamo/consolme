@@ -426,6 +426,12 @@ static void __Console_UpdateAutocomplete(ConsoleCtx *ctx)
     ac->is_active = (ac->match_count > 0);
 }
 
+static void __Console_ShowBlinker(ConsoleInputBox *box)
+{
+    box->blink_timer = 0.0f;
+    box->cursor_visible = true;
+}
+
 void Console_Update(ConsoleCtx *ctx)
 {
     if (IsKeyPressed(ctx->cfg.open_key))
@@ -441,6 +447,7 @@ void Console_Update(ConsoleCtx *ctx)
     ConsoleInputBox *box = &ctx->box;
     ConsoleAutocomplete *ac = &ctx->autocomplete;
     bool buffer_changed = false;
+    bool cursor_changed = false;
 
     int key = GetCharPressed();
     while (key > 0)
@@ -476,6 +483,7 @@ void Console_Update(ConsoleCtx *ctx)
         box->buffer_len--;
 
         buffer_changed = true;
+        cursor_changed = true;
     }
 
     if (ac->is_active)
@@ -499,16 +507,113 @@ void Console_Update(ConsoleCtx *ctx)
             box->buffer_len = strlen(box->buffer);
             box->cursor_pos = box->buffer_len;
             buffer_changed = true;
+            cursor_changed = true;
         }
     }
     else
     {
         // TODO: scroll stuff later
     }
-    if (IsKeyPressed(KEY_LEFT) && box->cursor_pos > 0) { box->cursor_pos--; }
+
+    if (IsKeyPressed(KEY_LEFT) && box->cursor_pos > 0)
+    {
+        box->cursor_pos--;
+        cursor_changed = true;
+    }
     if (IsKeyPressed(KEY_RIGHT) && box->cursor_pos < box->buffer_len)
     {
         box->cursor_pos++;
+        cursor_changed = true;
+    }
+
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_A))
+    {
+        box->cursor_pos = 0;
+        cursor_changed = true;
+    }
+
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_E))
+    {
+        box->cursor_pos = box->buffer_len;
+        cursor_changed = true;
+    }
+
+    if (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_F))
+    {
+        size_t p = box->cursor_pos;
+
+        while (p < box->buffer_len &&
+               (box->buffer[p] == ' ' || box->buffer[p] == '.'))
+        {
+            p++;
+        }
+
+        while (p < box->buffer_len && box->buffer[p] != ' ' &&
+               box->buffer[p] != '.')
+        {
+            p++;
+        }
+
+        if (p < box->buffer_len)
+        {
+            if (box->buffer[p] == '.') { p++; }
+            else if (box->buffer[p] == ' ')
+            {
+                while (p < box->buffer_len && box->buffer[p] == ' ') p++;
+            }
+        }
+
+        box->cursor_pos = p;
+        cursor_changed = true;
+    }
+
+    if (IsKeyDown(KEY_LEFT_ALT) && IsKeyPressed(KEY_B))
+    {
+        size_t p = box->cursor_pos;
+
+        while (p > 0 &&
+               (box->buffer[p - 1] == ' ' || box->buffer[p - 1] == '.'))
+        {
+            p--;
+        }
+        while (p > 0 && box->buffer[p - 1] != ' ' && box->buffer[p - 1] != '.')
+        {
+            p--;
+        }
+
+        box->cursor_pos = p;
+        cursor_changed = true;
+    }
+
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_W))
+    {
+        size_t p = box->cursor_pos;
+
+        while (p > 0 &&
+               (box->buffer[p - 1] == ' ' || box->buffer[p - 1] == '.'))
+        {
+            p--;
+        }
+        while (p > 0 && box->buffer[p - 1] != ' ' && box->buffer[p - 1] != '.')
+        {
+            p--;
+        }
+        while (p > 0 &&
+               (box->buffer[p - 1] == ' ' || box->buffer[p - 1] == '.'))
+        {
+            p--;
+        }
+
+        size_t chars_to_del = box->cursor_pos - p;
+
+        memmove(&box->buffer[p], &box->buffer[box->cursor_pos],
+                box->buffer_len - box->cursor_pos + 1);
+        box->buffer_len -= chars_to_del;
+
+        box->cursor_pos = p;
+
+        cursor_changed = true;
+        buffer_changed = true;
     }
 
     if (IsKeyPressed(KEY_ENTER))
@@ -542,14 +647,12 @@ void Console_Update(ConsoleCtx *ctx)
 
         ac->is_active = false;
         buffer_changed = false;
+        cursor_changed = true;
     }
 
-    if (buffer_changed)
-    {
-        box->blink_timer = 0.0f;
-        box->cursor_visible = true;
-        __Console_UpdateAutocomplete(ctx);
-    }
+    if (cursor_changed) { __Console_ShowBlinker(box); }
+
+    if (buffer_changed) { __Console_UpdateAutocomplete(ctx); }
     else
     {
 
@@ -995,19 +1098,19 @@ ConsoleResponse Console_ReflectionGet(void *base_instance,
     {
         int val = *(int *)target;
         snprintf(response_msg, MAX_INPUT_CHARS, "%s = %d", path, val);
-        return CMD_ERROR();
+        return CMD_SUCCESS();
     }
     else if (leaf->type == TYPE_FLOAT)
     {
         float val = *(float *)target;
         snprintf(response_msg, MAX_INPUT_CHARS, "%s = %.2f", path, val);
-        return CMD_ERROR();
+        return CMD_SUCCESS();
     }
     else if (leaf->type == TYPE_STR)
     {
         char *val = target;
         snprintf(response_msg, MAX_INPUT_CHARS, "%s = %s", path, val);
-        return CMD_ERROR();
+        return CMD_SUCCESS();
     }
 
     if (custom_handler != NULL)
