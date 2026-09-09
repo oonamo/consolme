@@ -1166,8 +1166,6 @@ ConsoleResponse Console_ReflectionSet(void *base_instance,
 
     if (argc < 1) return CMD_ERROR();
 
-    void *target = (char *)target_struct + leaf->offset;
-
     if (leaf->type == TYPE_INT)
     {
         int val = CONSOLME_ARG_INT(0);
