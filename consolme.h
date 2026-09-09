@@ -50,8 +50,8 @@ typedef struct
     Color border;
 
     Font font;
-    int font_size;
-    int font_spacing;
+    float font_size;
+    float font_spacing;
 
     ConsoleInputBoxCfg input_cfg;
     KeyboardKey open_key;
@@ -295,8 +295,11 @@ void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
 
 #define GET_FONT_CONFG(cfg)                                                    \
     Font font = cfg->font.texture.id != 0 ? cfg->font : GetFontDefault();      \
-    int f_size = cfg->font_size > 0 ? cfg->font_size : 20;                     \
-    int f_spacing = cfg->font_spacing > 0 ? cfg->font_spacing : 1;
+    float f_size = cfg->font_size > 0 ? cfg->font_size : 20;                   \
+    float f_spacing = cfg->font_spacing > 0 ? cfg->font_spacing : 1;           \
+    (void)font;                                                                \
+    (void)f_size;                                                              \
+    (void)f_spacing;
 
 void Console_Setup(ConsoleCtx *ctx)
 {
@@ -888,7 +891,7 @@ static void __Console_Draw_History(ConsoleCtx *ctx)
     int start_y = cfg->bounds.y + cfg->bounds.height -
                   cfg->input_cfg.box.height - f_size - 10;
 
-    for (int i = ctx->history_count - 1; i >= 0; i--)
+    for (int i = (int)ctx->history_count - 1; i >= 0; i--)
     {
         ConsoleLine *line = &ctx->history[i];
 
