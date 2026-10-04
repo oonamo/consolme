@@ -12,12 +12,118 @@
 #define BKSP_POLL_REPEAT 0.05f
 #endif
 
+#ifndef CONSOLE_MAX_ELEM_SIZE_BUF
+#define CONSOLE_MAX_ELEM_SIZE_BUF 256
+#endif
+
+#define CONSOLME_ARG_INT(idx) atoi(argv[idx])
+#define CONSOLME_ARG_FLOAT(idx) (float)atof(argv[idx])
+#define CONSOLME_ARG_STR(idx) (argv[idx])
+#define CONSOLME_ARG_COLOR(idx) (unsigned char)CONSOLME_ARG_INT(idx)
+
+#define CONSOLME_RESPOND(buf, msg, ...)                                        \
+    snprintf(buf, MAX_INPUT_CHARS, msg, ##__VA_ARGS__)
+
 #define CONSOLME_REQUIRE_NARGS(n, output, type)                                \
     if (argc < (n))                                                            \
     {                                                                          \
-        snprintf(output, MAX_INPUT_CHARS,                                      \
-                 "Error: " #type " requires %d values", n);                    \
+        CONSOLME_RESPOND(output, "Error: " #type " requires %d values", n);    \
         return CMD_ERROR();                                                    \
+    }
+
+#define DEFINE_COLOR_SETTER(func_name)                                         \
+    static ConsoleResponse func_name(void *target_struct, int argc,            \
+                                     char **argv, char *msg)                   \
+    {                                                                          \
+        Color *val = (Color *)target_struct;                                   \
+        if (argc == 1)                                                         \
+        {                                                                      \
+            char *end;                                                         \
+            unsigned long hex_val = strtoul(argv[0], &end, 16);                \
+            if (*end != '\0')                                                  \
+            {                                                                  \
+                snprintf(msg, MAX_INPUT_CHARS,                                 \
+                         "Error: Expected 0xRRGGBBAA format");                 \
+                return CMD_ERROR();                                            \
+            }                                                                  \
+            val->r = (hex_val >> 24) & 0xFF;                                   \
+            val->g = (hex_val >> 16) & 0xFF;                                   \
+            val->b = (hex_val >> 8) & 0xFF;                                    \
+            val->a = hex_val & 0xFF;                                           \
+        }                                                                      \
+        else if (argc >= 3)                                                    \
+        {                                                                      \
+            val->r = CONSOLME_ARG_COLOR(0);                                    \
+            val->g = CONSOLME_ARG_COLOR(1);                                    \
+            val->b = CONSOLME_ARG_COLOR(2);                                    \
+            val->a = argc >= 4 ? CONSOLME_ARG_COLOR(3) : 255;                  \
+        }                                                                      \
+        else                                                                   \
+        {                                                                      \
+            snprintf(msg, MAX_INPUT_CHARS,                                     \
+                     "Error: Color requirs 1 hex argument (0xRRGGBBAA) or 3 "  \
+                     "or more args (R G B A (optional)");                      \
+            return CMD_ERROR();                                                \
+        }                                                                      \
+        snprintf(msg, MAX_INPUT_CHARS, "Set to {R:%d, G:%d, B:%d, A:%d}",      \
+                 val->r, val->g, val->b, val->a);                              \
+        return CMD_COLOR(*val);                                                \
+    }
+
+#define DEFINE_COLOR_GETTER(func_name)                                         \
+    static ConsoleResponse func_name(void *target_struct, char *msg)           \
+    {                                                                          \
+        Color *val = (Color *)target_struct;                                   \
+        snprintf(msg, MAX_INPUT_CHARS,                                         \
+                 "{R:%d, G:%d, B:%d, A:%d} (0x%02X%02X%02X%02X)", val->r,      \
+                 val->g, val->b, val->a, val->r, val->g, val->b, val->a);      \
+        return CMD_COLOR(*val);                                                \
+    }
+
+#define DEFINE_FLOAT2_SETTER(func_name, struct_type, f1, f2)                   \
+    static ConsoleResponse func_name(void *target_struct, int argc,            \
+                                     char **argv, char *msg)                   \
+    {                                                                          \
+        CONSOLME_REQUIRE_NARGS(2, msg, struct_type);                           \
+        struct_type *val = (struct_type *)target_struct;                       \
+        val->f1 = CONSOLME_ARG_FLOAT(0);                                       \
+        val->f2 = CONSOLME_ARG_FLOAT(1);                                       \
+        snprintf(msg, MAX_INPUT_CHARS, #struct_type " set to [%.2f, %.2f]",    \
+                 val->f1, val->f2);                                            \
+        return CMD_SUCCESS();                                                  \
+    }
+
+#define DEFINE_FLOAT2_GETTER(func_name, struct_type, f1, f2)                   \
+    static ConsoleResponse func_name(void *target_struct, char *msg)           \
+    {                                                                          \
+        struct_type *val = (struct_type *)target_struct;                       \
+        snprintf(msg, MAX_INPUT_CHARS, "[%.2f, %.2f]", val->f1, val->f2);      \
+        return CMD_SUCCESS();                                                  \
+    }
+
+#define DEFINE_FLOAT4_SETTER(func_name, struct_type, f1, f2, f3, f4)           \
+    static ConsoleResponse func_name(void *target_struct, int argc,            \
+                                     char **argv, char *msg)                   \
+    {                                                                          \
+        CONSOLME_REQUIRE_NARGS(2, msg, struct_type);                           \
+        struct_type *val = (struct_type *)target_struct;                       \
+        val->f1 = CONSOLME_ARG_FLOAT(0);                                       \
+        val->f2 = CONSOLME_ARG_FLOAT(1);                                       \
+        val->f3 = CONSOLME_ARG_FLOAT(2);                                       \
+        val->f4 = CONSOLME_ARG_FLOAT(3);                                       \
+        snprintf(msg, MAX_INPUT_CHARS,                                         \
+                 #struct_type " set to [%.2f, %.2f, %.2f, %2.f]", val->f1,     \
+                 val->f2, val->f3, val->f4);                                   \
+        return CMD_SUCCESS();                                                  \
+    }
+
+#define DEFINE_FLOAT4_GETTER(func_name, struct_type, f1, f2)                   \
+    static ConsoleResponse func_name(void *target_struct, char *msg)           \
+    {                                                                          \
+        struct_type *val = (struct_type *)target_struct;                       \
+        snprintf(msg, MAXMAX_INPUT_CHARS, "[%.2f, %.2f, %.2f, %.2f]", val->f1, \
+                 val->f2, val->f3, val->f4);                                   \
+        return CMD_SUCCESS();                                                  \
     }
 
 typedef struct
@@ -139,12 +245,18 @@ bool Console_RegisterDynamicCommand(ConsoleCtx *ctx, const char *name,
 
 int Console_Tokenize(char *buffer, char *args[], int max_args);
 
+void Console_Clear(ConsoleCtx *ctx);
 void Console_DrawUI(ConsoleCtx *ctx);
 
 #ifdef CONSOLME_EXTENSION_CMYREFLECTION
 #ifndef _CMYREFLECTION_H
 #error                                                                         \
     "consolme: CONSOLME_EXTENSION_CMYREFLECTION is defined, but cmyreflection.h was not included before consolme.h."
+#endif
+
+#ifndef CMY_HAS_FORMAT_PLUGIN
+#error                                                                         \
+    "consolme: CONSOLME_EXTENSION_CMYREFLECTION is defined, but required plugin 'format' is not available"
 #endif
 
 #include <stdint.h>
@@ -160,129 +272,22 @@ typedef struct
 } ConsoleReflectionCfg;
 
 typedef ConsoleResponse (*ReflectionTypeHandler)(void *target_struct,
-                                                 const FieldInfo *leaf,
+                                                 const StructFieldInfo *leaf,
                                                  void *field, int argc,
                                                  char **argv,
                                                  char *response_msg);
 
-ConsoleResponse Console_ReflectionSet(void *base_instance,
-                                      const FieldInfo *base_meta,
-                                      size_t base_count, const char *path,
-                                      int argc, char **argv,
-                                      ReflectionTypeHandler custom_handler,
-                                      char *response_msg);
-
 ConsoleResponse Console_ReflectionGet(void *base_instance,
-                                      const FieldInfo *base_meta,
+                                      const StructFieldInfo *base_meta,
                                       size_t base_count, const char *path,
                                       int argc, char **argv,
                                       ReflectionTypeHandler custom_handler,
                                       char *response_msg);
 
 void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
-                                          const FieldInfo *metadata,
+                                          const StructFieldInfo *metadata,
                                           size_t field_count,
                                           ConsoleReflectionCfg cfg);
-
-#define CONSOLME_ARG_INT(idx) atoi(argv[idx])
-#define CONSOLME_ARG_FLOAT(idx) (float)atof(argv[idx])
-#define CONSOLME_ARG_STR(idx) (argv[idx])
-#define CONSOLME_ARG_COLOR(idx) (unsigned char)CONSOLME_ARG_INT(idx)
-
-#define DEFINE_COLOR_SETTER(func_name)                                         \
-    static ConsoleResponse func_name(void *target_struct, int argc,            \
-                                     char **argv, char *msg)                   \
-    {                                                                          \
-        Color *val = (Color *)target_struct;                                   \
-        if (argc == 1)                                                         \
-        {                                                                      \
-            char *end;                                                         \
-            unsigned long hex_val = strtoul(argv[0], &end, 16);                \
-            if (*end != '\0')                                                  \
-            {                                                                  \
-                snprintf(msg, MAX_INPUT_CHARS,                                 \
-                         "Error: Expected 0xRRGGBBAA format");                 \
-                return CMD_ERROR();                                            \
-            }                                                                  \
-            val->r = (hex_val >> 24) & 0xFF;                                   \
-            val->g = (hex_val >> 16) & 0xFF;                                   \
-            val->b = (hex_val >> 8) & 0xFF;                                    \
-            val->a = hex_val & 0xFF;                                           \
-        }                                                                      \
-        else if (argc >= 3)                                                    \
-        {                                                                      \
-            val->r = CONSOLME_ARG_COLOR(0);                                    \
-            val->g = CONSOLME_ARG_COLOR(1);                                    \
-            val->b = CONSOLME_ARG_COLOR(2);                                    \
-            val->a = argc >= 4 ? CONSOLME_ARG_COLOR(3) : 255;                  \
-        }                                                                      \
-        else                                                                   \
-        {                                                                      \
-            snprintf(msg, MAX_INPUT_CHARS,                                     \
-                     "Error: Color requirs 1 hex argument (0xRRGGBBAA) or 3 "  \
-                     "or more args (R G B A (optional)");                      \
-            return CMD_ERROR();                                                \
-        }                                                                      \
-        snprintf(msg, MAX_INPUT_CHARS, "Set to {R:%d, G:%d, B:%d, A:%d}",      \
-                 val->r, val->g, val->b, val->a);                              \
-        return CMD_COLOR(*val);                                                \
-    }
-
-#define DEFINE_COLOR_GETTER(func_name)                                         \
-    static ConsoleResponse func_name(void *target_struct, char *msg)           \
-    {                                                                          \
-        Color *val = (Color *)target_struct;                                   \
-        snprintf(msg, MAX_INPUT_CHARS,                                         \
-                 "{R:%d, G:%d, B:%d, A:%d} (0x%02X%02X%02X%02X)", val->r,      \
-                 val->g, val->b, val->a, val->r, val->g, val->b, val->a);      \
-        return CMD_COLOR(*val);                                                \
-    }
-
-#define DEFINE_FLOAT2_SETTER(func_name, struct_type, f1, f2)                   \
-    static ConsoleResponse func_name(void *target_struct, int argc,            \
-                                     char **argv, char *msg)                   \
-    {                                                                          \
-        CONSOLME_REQUIRE_NARGS(2, msg, struct_type);                           \
-        struct_type *val = (struct_type *)target_struct;                       \
-        val->f1 = CONSOLME_ARG_FLOAT(0);                                       \
-        val->f2 = CONSOLME_ARG_FLOAT(1);                                       \
-        snprintf(msg, MAX_INPUT_CHARS, #struct_type " set to [%.2f, %.2f]",    \
-                 val->f1, val->f2);                                            \
-        return CMD_SUCCESS();                                                  \
-    }
-
-#define DEFINE_FLOAT2_GETTER(func_name, struct_type, f1, f2)                   \
-    static ConsoleResponse func_name(void *target_struct, char *msg)           \
-    {                                                                          \
-        struct_type *val = (struct_type *)target_struct;                       \
-        snprintf(msg, MAX_INPUT_CHARS, "[%.2f, %.2f]", val->f1, val->f2);      \
-        return CMD_SUCCESS();                                                  \
-    }
-
-#define DEFINE_FLOAT4_SETTER(func_name, struct_type, f1, f2, f3, f4)           \
-    static ConsoleResponse func_name(void *target_struct, int argc,            \
-                                     char **argv, char *msg)                   \
-    {                                                                          \
-        CONSOLME_REQUIRE_NARGS(2, msg, struct_type);                           \
-        struct_type *val = (struct_type *)target_struct;                       \
-        val->f1 = CONSOLME_ARG_FLOAT(0);                                       \
-        val->f2 = CONSOLME_ARG_FLOAT(1);                                       \
-        val->f3 = CONSOLME_ARG_FLOAT(2);                                       \
-        val->f4 = CONSOLME_ARG_FLOAT(3);                                       \
-        snprintf(msg, MAX_INPUT_CHARS,                                         \
-                 #struct_type " set to [%.2f, %.2f, %.2f, %2.f]", val->f1,     \
-                 val->f2, val->f3, val->f4);                                   \
-        return CMD_SUCCESS();                                                  \
-    }
-
-#define DEFINE_FLOAT4_GETTER(func_name, struct_type, f1, f2)                   \
-    static ConsoleResponse func_name(void *target_struct, char *msg)           \
-    {                                                                          \
-        struct_type *val = (struct_type *)target_struct;                       \
-        snprintf(msg, MAXMAX_INPUT_CHARS, "[%.2f, %.2f, %.2f, %.2f]", val->f1, \
-                 val->f2, val->f3, val->f4);                                   \
-        return CMD_SUCCESS();                                                  \
-    }
 
 #endif
 
@@ -1005,6 +1010,14 @@ void Console_DrawUI(ConsoleCtx *ctx)
 #include <stdio.h>
 #include <stdlib.h>
 
+extern ReflectResult get_field_as_str(const void *instance,
+                                      const StructFieldInfo *field,
+                                      char *out_buf, size_t buflen);
+
+extern ReflectResult set_field_from_str(void *instance,
+                                        const StructFieldInfo *field,
+                                        const char *str_val);
+
 typedef struct
 {
     char **items;
@@ -1015,7 +1028,7 @@ typedef struct
 typedef struct
 {
     char *prefix;
-    const FieldInfo *fields;
+    const StructFieldInfo *fields;
     size_t field_count;
 } QueueItem;
 
@@ -1030,7 +1043,7 @@ static void PushStr(StringList *list, char *str)
 }
 
 void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
-                                          const FieldInfo *metadata,
+                                          const StructFieldInfo *metadata,
                                           size_t field_count,
                                           ConsoleReflectionCfg cfg)
 {
@@ -1054,7 +1067,7 @@ void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
 
         for (size_t i = 0; i < current.field_count; i++)
         {
-            const FieldInfo *field = &current.fields[i];
+            const StructFieldInfo *field = &current.fields[i];
 
             size_t iter_count = (field->count > 0) ? field->count : 1;
             bool is_array = (field->count > 1);
@@ -1088,7 +1101,7 @@ void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
                 }
 
                 StructMetaData child_meta = {0};
-                if (get_struct_metadata(field->type, &child_meta))
+                if (get_struct_metadata(field->type, &child_meta) == REFLECT_OK)
                 {
                     if (q_tail >= q_capacity)
                     {
@@ -1132,9 +1145,10 @@ void Console_GenerateReflectionCompletion(ConsoleCtx *ctx, const char *basename,
 }
 
 static void *__Console_GetTargetStruct(void *base_instance,
-                                       const FieldInfo *base_meta,
+                                       const StructFieldInfo *base_meta,
                                        size_t base_count, const char *path,
-                                       const FieldInfo **leaf)
+                                       const StructFieldInfo **leaf,
+                                       int *out_idx)
 {
     char clean_path[MAX_INPUT_CHARS];
     snprintf(clean_path, sizeof(clean_path), "%s", path);
@@ -1142,20 +1156,23 @@ static void *__Console_GetTargetStruct(void *base_instance,
     size_t len = strlen(clean_path);
     if (len > 0 && clean_path[len - 1] == '.') { clean_path[len - 1] = '\0'; }
 
-    return resolve_field_path(base_instance, base_meta, base_count, clean_path,
-                              leaf);
+    return resolve_field_path_ext(base_instance, base_meta, base_count,
+                                  clean_path, leaf, out_idx);
 }
 
 ConsoleResponse Console_ReflectionSet(void *base_instance,
-                                      const FieldInfo *base_meta,
+                                      const StructFieldInfo *base_meta,
                                       size_t base_count, const char *path,
                                       int argc, char **argv,
                                       ReflectionTypeHandler custom_handler,
                                       char *response_msg)
 {
-    const FieldInfo *leaf = NULL;
-    void *target_struct = __Console_GetTargetStruct(base_instance, base_meta,
-                                                    base_count, path, &leaf);
+    CONSOLME_REQUIRE_NARGS(1, response_msg, "set");
+
+    int out_idx = -1;
+    const StructFieldInfo *leaf = NULL;
+    void *target_struct = __Console_GetTargetStruct(
+        base_instance, base_meta, base_count, path, &leaf, &out_idx);
 
     if (!target_struct || !leaf)
     {
@@ -1164,43 +1181,61 @@ ConsoleResponse Console_ReflectionSet(void *base_instance,
         return CMD_ERROR();
     }
 
-    if (argc < 1) return CMD_ERROR();
+    void *eval_instance = target_struct;
+    StructFieldInfo eval_leaf = *leaf;
+    uint8_t array_elem_buf[CONSOLE_MAX_ELEM_SIZE_BUF];
 
-    if (leaf->type == TYPE_INT)
+    if (out_idx >= 0)
     {
-        int val = CONSOLME_ARG_INT(0);
+        FIELD_TYPE base_type = get_base_type(leaf->type);
+        size_t size_of_base_type = get_type_size(base_type);
 
-        if (!set_field_int(target_struct, leaf, val)) return CMD_ERROR();
-
-        snprintf(response_msg, MAX_INPUT_CHARS, "Set to %d", val);
-        return CMD_SUCCESS();
-    }
-    else if (leaf->type == TYPE_FLOAT)
-    {
-        float val = CONSOLME_ARG_FLOAT(0);
-
-        if (!set_field_float(target_struct, leaf, val))
+        if (base_type == leaf->type)
         {
-            snprintf(response_msg, MAX_INPUT_CHARS, "Could not set to %.2f",
-                     val);
+            CONSOLME_RESPOND(response_msg,
+                             "Could not resolve base type of '%s'",
+                             get_name_of_type(leaf->type));
             return CMD_ERROR();
-        };
+        }
 
-        snprintf(response_msg, MAX_INPUT_CHARS, "Set to %.2f", val);
-        return CMD_SUCCESS();
-    }
-    else if (leaf->type == TYPE_STR)
-    {
-        snprintf(response_msg, MAX_INPUT_CHARS, "Unimplmented Str");
-        /// set_field_str();
-        return CMD_ERROR();
+        if (size_of_base_type > sizeof(array_elem_buf))
+        {
+            CONSOLME_RESPOND(response_msg,
+                             "Element size exceeds console buffer");
+            return CMD_ERROR();
+        }
+
+        ReflectResult res =
+            get_array_element(target_struct, leaf, (size_t)out_idx,
+                              array_elem_buf, get_type_size(base_type));
+
+        if (res != REFLECT_OK)
+        {
+            CONSOLME_RESPOND(response_msg,
+                             "Could not access element. Reason: %d", res);
+            return CMD_ERROR();
+        }
+
+        // HACK: Phantom leaf, eval_instance is a pointer to the element
+        eval_instance = array_elem_buf;
+        eval_leaf.type = base_type;
+        eval_leaf.offset = 0;
+        eval_leaf.count = 1;
+        eval_leaf.size = size_of_base_type;
     }
 
     if (custom_handler != NULL)
     {
-        return custom_handler(target_struct, leaf,
-                              (char *)target_struct + leaf->offset, argc, argv,
-                              response_msg);
+        ConsoleResponse user_res = custom_handler(
+            target_struct, leaf, (char *)target_struct + leaf->offset, argc,
+            argv, response_msg);
+        if (user_res.success) { return user_res; }
+    }
+
+    if (set_field_from_str(eval_instance, &eval_leaf, argv[0]) == REFLECT_OK)
+    {
+        CONSOLME_RESPOND(response_msg, "%s = %s", path, argv[0]);
+        return CMD_SUCCESS();
     }
 
     snprintf(response_msg, MAX_INPUT_CHARS,
@@ -1210,16 +1245,17 @@ ConsoleResponse Console_ReflectionSet(void *base_instance,
 }
 
 ConsoleResponse Console_ReflectionGet(void *base_instance,
-                                      const FieldInfo *base_meta,
+                                      const StructFieldInfo *base_meta,
                                       size_t base_count, const char *path,
                                       int argc, char **argv,
                                       ReflectionTypeHandler custom_handler,
                                       char *response_msg)
 {
 
-    const FieldInfo *leaf = NULL;
-    void *target_struct = __Console_GetTargetStruct(base_instance, base_meta,
-                                                    base_count, path, &leaf);
+    const StructFieldInfo *leaf = NULL;
+    int out_idx = -1;
+    void *target_struct = __Console_GetTargetStruct(
+        base_instance, base_meta, base_count, path, &leaf, &out_idx);
 
     if (!leaf || !target_struct)
     {
@@ -1228,37 +1264,71 @@ ConsoleResponse Console_ReflectionGet(void *base_instance,
         return CMD_ERROR();
     }
 
-    void *target = (char *)target_struct + leaf->offset;
+    void *eval_instance = target_struct;
+    StructFieldInfo eval_leaf = *leaf;
 
-    if (leaf->type == TYPE_INT)
+    uint8_t array_elem_buf[CONSOLE_MAX_ELEM_SIZE_BUF];
+
+    if (out_idx >= 0)
     {
-        int val = *(int *)target;
-        snprintf(response_msg, MAX_INPUT_CHARS, "%s = %d", path, val);
-        return CMD_SUCCESS();
-    }
-    else if (leaf->type == TYPE_FLOAT)
-    {
-        float val = *(float *)target;
-        snprintf(response_msg, MAX_INPUT_CHARS, "%s = %.2f", path, val);
-        return CMD_SUCCESS();
-    }
-    else if (leaf->type == TYPE_STR)
-    {
-        char *val = target;
-        snprintf(response_msg, MAX_INPUT_CHARS, "%s = %s", path, val);
-        return CMD_SUCCESS();
+        FIELD_TYPE base_type = get_base_type(leaf->type);
+        size_t size_of_base_type = get_type_size(base_type);
+
+        if (base_type == leaf->type)
+        {
+            CONSOLME_RESPOND(response_msg,
+                             "Could not resolve base type of '%s'",
+                             get_name_of_type(leaf->type));
+            return CMD_ERROR();
+        }
+
+        if (size_of_base_type > sizeof(array_elem_buf))
+        {
+            CONSOLME_RESPOND(response_msg,
+                             "Element size exceeds console buffer");
+            return CMD_ERROR();
+        }
+
+        ReflectResult res =
+            get_array_element(target_struct, leaf, (size_t)out_idx,
+                              array_elem_buf, get_type_size(base_type));
+
+        if (res != REFLECT_OK)
+        {
+            CONSOLME_RESPOND(response_msg,
+                             "Could not access element. Reason: %d", res);
+            return CMD_ERROR();
+        }
+
+        // HACK: Phantom leaf, eval_instance is a pointer to the element
+        eval_instance = array_elem_buf;
+        eval_leaf.type = base_type;
+        eval_leaf.offset = 0;
+        eval_leaf.count = 1;
+        eval_leaf.size = size_of_base_type;
     }
 
+    char temp_buf[MAX_INPUT_CHARS];
     if (custom_handler != NULL)
     {
-        return custom_handler(target_struct, leaf,
-                              (char *)target_struct + leaf->offset, argc, argv,
-                              response_msg);
+        ConsoleResponse user_res = custom_handler(
+            eval_instance, &eval_leaf, (char *)target_struct + eval_leaf.offset,
+            argc, argv, response_msg);
+
+        if (user_res.success) { return user_res; }
     }
 
-    snprintf(response_msg, MAX_INPUT_CHARS, "%s = %p", path, target);
-    return CMD_SUCCESS();
+    if (get_field_as_str(eval_instance, &eval_leaf, temp_buf,
+                         MAX_INPUT_CHARS) == REFLECT_OK)
+    {
+        CONSOLME_RESPOND(response_msg, "%s = %s", path, temp_buf);
+        return CMD_SUCCESS();
+    }
+
+    return CMD_ERROR();
 }
+
+void Console_Clear(ConsoleCtx *ctx) { ctx->history_count = 0; }
 #endif
 
 #endif

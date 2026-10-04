@@ -38,6 +38,7 @@ Game g = {.state = GAME_PLAYING,
               30,
               .ball_color = GRAY,
           }};
+ConsoleCtx console = {0};
 
 //----------------------------------------
 // Type Handlers & Macros
@@ -52,9 +53,10 @@ DEFINE_FLOAT2_SETTER(Set_Vector2, Vector2, x, y);
 DEFINE_FLOAT2_GETTER(Get_Vector2, Vector2, x, y);
 
 // Routes type-specific setters to their generated macros
-ConsoleResponse GameTypeSetter(void *target_struct, const FieldInfo *leaf,
-                               void *field_ptr, int argc, char **argv,
-                               char *response_msg)
+static ConsoleResponse GameTypeSetter(void *target_struct,
+                                      const StructFieldInfo *leaf,
+                                      void *field_ptr, int argc, char **argv,
+                                      char *response_msg)
 {
 
     switch (leaf->type)
@@ -72,9 +74,10 @@ ConsoleResponse GameTypeSetter(void *target_struct, const FieldInfo *leaf,
 }
 
 // Routes type-specific getters to theire generated macros
-ConsoleResponse GameTypeGetter(void *target_struct, const FieldInfo *leaf,
-                               void *field_ptr, int argc, char **argv,
-                               char *response_msg)
+static ConsoleResponse GameTypeGetter(void *target_struct,
+                                      const StructFieldInfo *leaf,
+                                      void *field_ptr, int argc, char **argv,
+                                      char *response_msg)
 {
     switch (leaf->type)
     {
@@ -90,9 +93,23 @@ ConsoleResponse GameTypeGetter(void *target_struct, const FieldInfo *leaf,
     }
 }
 
+static ConsoleResponse GameTypeJsonDumper(void *target_struct,
+                                          const StructFieldInfo *leaf,
+                                          void *field_ptr, int argc,
+                                          char **argv, char *response_msg)
+{
+
+    if (to_json(target_struct, leaf->type, response_msg, MAX_INPUT_CHARS) ==
+        REFLECT_OK)
+    {
+        return CMD_SUCCESS();
+    }
+    return CMD_ERROR();
+}
+
 // Command router. Controls the actual execution and result of the commands
-ConsoleResponse GameConsole(const char *command, void *user_data,
-                            char *response_msg)
+static ConsoleResponse GameConsole(const char *command, void *user_data,
+                                   char *response_msg)
 {
     // Hack to not use global context incase scope changes;
     Game *active_game = (Game *)user_data;
@@ -117,14 +134,15 @@ ConsoleResponse GameConsole(const char *command, void *user_data,
 
         return Console_ReflectionSet(active_game, Game_Metadata,
                                      Game_FieldCount, argv[1], argc - 2,
-                                     argv + 2, GameTypeSetter, response_msg);
+                                     argv + 2, NULL, response_msg);
+        return CMD_SUCCESS();
     }
     // Route dynamic reflection getters ("get main_ball.pos")
     else if (strcmp(argv[0], "get") == 0)
     {
         if (argc < 2)
         {
-            snprintf(response_msg, MAX_INPUT_CHARS, "Usage: set <path>");
+            snprintf(response_msg, MAX_INPUT_CHARS, "Usage: get <path>");
             return CMD_ERROR();
         }
 
@@ -153,6 +171,33 @@ ConsoleResponse GameConsole(const char *command, void *user_data,
         }
         g.state = GAME_PLAYING;
         snprintf(response_msg, MAX_INPUT_CHARS, "Resuming game");
+        return CMD_SUCCESS();
+    }
+    else if (strcmp(argv[0], "dump") == 0)
+    {
+        if (argc < 2)
+        {
+            snprintf(response_msg, MAX_INPUT_CHARS, "Usage: get <path>");
+            return CMD_ERROR();
+        }
+
+        if (argv[1][0] == '*')
+        {
+            if (to_json(&g, TYPE_STRUCT_GAME, response_msg, MAX_INPUT_CHARS) ==
+                REFLECT_OK)
+            {
+                return CMD_SUCCESS();
+            }
+            return CMD_ERROR();
+        }
+
+        return Console_ReflectionGet(
+            active_game, Game_Metadata, Game_FieldCount, argv[1], argc - 2,
+            argv + 2, GameTypeJsonDumper, response_msg);
+    }
+    else if (strcmp(argv[0], "clear") == 0)
+    {
+        Console_Clear(&console);
         return CMD_SUCCESS();
     }
 
@@ -214,7 +259,6 @@ int main(void)
     };
 
     // Initialize context
-    ConsoleCtx console = {0};
     console.cfg = cfg;
 
     Console_Setup(&console);
@@ -226,8 +270,10 @@ int main(void)
     // Register standard commands
     // Static commands should contain elements that exist on the stack
     const char *null_args[] = {NULL};
+
     Console_RegisterStaticCommand(&console, "pause", null_args, 0);
     Console_RegisterStaticCommand(&console, "resume", null_args, 0);
+    Console_RegisterStaticCommand(&console, "clear", null_args, 0);
 
     // Register reflection and autocompletion
     ConsoleReflectionCfg ref_cfg = {.enable_setter = true,
@@ -238,6 +284,10 @@ int main(void)
     Console_GenerateReflectionCompletion(&console, NULL, Game_Metadata,
                                          Game_FieldCount, ref_cfg);
 
+    ref_cfg.getter_cmd = "dump";
+    ref_cfg.enable_setter = false;
+    Console_GenerateReflectionCompletion(&console, NULL, Game_Metadata,
+                                         Game_FieldCount, ref_cfg);
     // ----------------------------------------
     // Main Game Loop
     // ----------------------------------------
@@ -302,4 +352,4 @@ int main(void)
     // ----------------------------------------
     Console_Free(&console); // Free allocated memory
     CloseWindow();
-};
+}

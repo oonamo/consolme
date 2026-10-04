@@ -2,27 +2,7 @@
 #define _TYPES_H
 #include "raylib.h"
 
-#ifdef __REFLECTION_PARSER__
-
-/// @reflect
-typedef struct
-{
-    float x;
-    float y;
-} Vector2;
-
-/// @reflect
-typedef struct
-{
-    unsigned char r;
-    unsigned char g;
-    unsigned char b;
-    unsigned char a;
-} Color;
-
-#endif // __REFLECTION_PARSER__
-
-/// @reflect
+/// cmy:reflect
 typedef struct
 {
     Vector2 pos;
@@ -31,14 +11,14 @@ typedef struct
     Color color;
 } Ball;
 
-/// @reflect
+/// cmy:reflect
 typedef struct
 {
     int bg_shade;
     Color ball_color;
 } Theme;
 
-/// @reflect
+/// cmy:reflect
 typedef enum
 {
     GAME_PLAYING,
@@ -47,7 +27,7 @@ typedef enum
 
 #define MAX_BALLS 9
 
-/// @reflect
+/// cmy:reflect
 typedef struct
 {
     Theme theme;
